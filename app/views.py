@@ -5,9 +5,10 @@ Werkzeug Documentation:  https://werkzeug.palletsprojects.com/
 This file creates your application.
 """
 
-from app import app
+from app import app,db
 from flask import render_template, request, jsonify, send_file, url_for, flash, send_from_directory
 from werkzeug.utils import secure_filename
+from flask_wtf.csrf import generate_csrf
 from app.forms import MovieForm
 from app.models import Movie
 import os
@@ -16,6 +17,9 @@ import os
 ###
 # Routing for your application.
 ###
+@app.route('/api/v1/csrf-token', methods=['GET'])
+def get_csrf():
+     return jsonify({'csrf_token': generate_csrf()})
 
 @app.route('/')
 def index():
@@ -24,6 +28,7 @@ def index():
 @app.route('/api/v1/movies', methods=['POST'])
 def movies():
     form = MovieForm() 
+    
 
     if form.validate_on_submit():
         title = form.title.data
@@ -35,23 +40,26 @@ def movies():
             app.config['UPLOAD_FOLDER'], filename
         ))
 
-        formErrors = form_errors()
 
-        #Checks if there are any errors
-        if formErrors == []:
-            errors = {
-                "errors": formErrors
-            }
-            return jsonify(errors)
-        
-        else:
-            data = {
-                "message": "Movie Successfully added",
-                "title": title,
-                "POSTER": filename,
-                "description": description
-            }
-            return jsonify(data)
+        newMovie = Movie(title, description, filename)
+
+        db.session.add(newMovie)
+        db.session.commit()
+
+        formErrors = form_errors()
+        data = {
+             "message": "Movie Successfully added",
+             "title": title,
+             "poster": filename,
+             "description": description
+         }
+        return jsonify(data)
+    else:
+         formErrors = form_errors(form)
+    errors = {
+        "errors": formErrors
+    }
+    return jsonify(errors)
 
    
 ###
